@@ -1,6 +1,9 @@
 package kulturneManifestacije;
 
+import java.lang.Character.UnicodeScript;
+import java.lang.annotation.Documented;
 import java.sql.*;
+import java.text.BreakIterator;
 import java.util.ArrayList;
 import java.util.Scanner;
 
@@ -73,6 +76,16 @@ public class TestKultMan {
 		}
 	}
 
+	// postoji grad sa nazivom X
+	public static Grad postojiGrad(String grad) {
+		for (int i = 0; i < listaGradova.size(); i++) {
+			if (listaGradova.get(i).getNaziv().equalsIgnoreCase(grad))
+				return listaGradova.get(i);
+		}
+		System.out.println("Ne postojeci grad.");
+		return null;
+	}
+
 	// proverava da li je unos integer dobar i pozitivan
 	public static boolean isIntegerAndPositive(String string) {
 		try {
@@ -105,8 +118,149 @@ public class TestKultMan {
 
 	}
 
+	public static boolean dodavanjeManifestacije() {
+		String idStr;
+		do {
+			System.out.println("Unesite id:");
+			idStr = sc.nextLine();
+		} while (!isIntegerAndPositive(idStr));
+		int id = Integer.parseInt(idStr);
+
+		for (int i = 0; i < listaKultMan.size(); i++) {
+			if (id == listaKultMan.get(i).getId()) {
+				System.out.println("Id vec postoji.");
+				return false;
+			}
+		}
+		System.out.println("Unesite naziv:");
+		String naziv = sc.nextLine();
+		String brStr;
+		do {
+			System.out.println("Unesite broj posetilaca:");
+			brStr = sc.nextLine();
+		} while (!isIntegerAndPositive(brStr));
+		int br = Integer.parseInt(brStr);
+		String grad;
+		do {
+			System.out.println("Unesite grad:");
+			grad = sc.nextLine().trim();
+		} while (postojiGrad(grad) == null);
+
+		KultMan k = new KultMan(id, naziv, br, postojiGrad(grad));
+		listaKultMan.add(k);
+
+		System.out.println("Uspesno dodato.");
+		return true;
+	}
+
+	public static boolean izmenaManifestacije() {
+		String idStr;
+		KultMan k = new KultMan();
+		do {
+			System.out.println("Unesite id:");
+			idStr = sc.nextLine();
+		} while (!isIntegerAndPositive(idStr));
+		int id = Integer.parseInt(idStr);
+		int brojac = 0;
+		for (int i = 0; i < listaKultMan.size(); i++) {
+			if (id == listaKultMan.get(i).getId()) {
+				k = listaKultMan.get(i);
+				System.out.println("Trenutno stanje: " + k);
+				brojac = 1;
+			}
+		}
+		if (brojac == 0) {
+			System.out.println("Ne postoji takva manifestacija.");
+			return false;
+		}
+		System.out.println("Unesite naziv:");
+		k.setNaziv(sc.nextLine());
+		String brStr;
+		do {
+			System.out.println("Unesite broj posetilaca:");
+			brStr = sc.nextLine();
+		} while (!isIntegerAndPositive(brStr));
+		int br = Integer.parseInt(brStr);
+		k.setBrPosetilaca(br);
+		String grad;
+		do {
+			System.out.println("Unesite grad:");
+			grad = sc.nextLine().trim();
+		} while (postojiGrad(grad) == null);
+		Grad g = postojiGrad(grad);
+		k.setGrad(g);
+		System.out.println(k);
+		System.out.println("Uspesno izmenjeno.");
+		return true;
+	}
+
+	// brisanje objekta iz liste
+	public static boolean brisanje() {
+
+		String idStr;
+		do {
+			System.out.println("Unesite id:");
+			idStr = sc.nextLine();
+		} while (!isIntegerAndPositive(idStr));
+		int id = Integer.parseInt(idStr);
+
+		for (int i = 0; i < listaKultMan.size(); i++) {
+			if (id == listaKultMan.get(i).getId()) {
+				listaKultMan.remove(i);
+				System.out.println("Uspesno.");
+				return true;
+			}
+		}
+		System.out.println("Neuspesno.");
+		return false;
+	}
+
+	public static void save() {//ili ce se sve odraditi, ili nista -transakcija
+		try {
+			Connection conn = DriverManager.getConnection(adress, user, pass);
+			conn.setAutoCommit(false); //podesavam transakciju
+			
+			Statement drop = conn.createStatement();
+			String s1 = "SET foreign_key_checks = 0";
+			String s2 = " truncate gradovi";
+			String s4 = "SET foreign_key_checks = 1";
+			String s3 = "truncate manifestacije";
+			//String s1 = "drop table kulturne_malifestacije_u_gradovima.gradovi";
+			//String s2 = "drop table kulturne_malifestacije_u_gradovima.manifestacije";
+			drop.executeUpdate(s1);
+			drop.executeUpdate(s2);
+			drop.executeUpdate(s3);
+			drop.executeUpdate(s4);
+			
+			for (int i = 0; i< listaGradova.size(); i++) {
+				PreparedStatement unos = conn.prepareStatement("Insert into gradovi (ptt, naziv_grada) values (?,?)");
+				unos.setInt(1,listaGradova.get(i).getPttbr());
+				unos.setString(2, listaGradova.get(i).getNaziv());
+				unos.executeUpdate();
+			}
+			
+			for(int i = 0; i< listaKultMan.size(); i++) {
+				
+				PreparedStatement unos = conn.prepareStatement("Insert into manifestacije (idkultMan, naziv, brojPosetilaca, pttGrad)"
+						+ " values (?,?,?,?)");
+				unos.setInt(1, listaKultMan.get(i).getId());
+				unos.setString(2, listaKultMan.get(i).getNaziv());
+				unos.setInt(3, listaKultMan.get(i).getBrPosetilaca());
+				unos.setInt(4, listaKultMan.get(i).getGrad().getPttbr());
+				unos.executeUpdate();
+			}
+			
+			conn.commit();
+			System.out.println("Sacuvano.");
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
 	public static void main(String[] args) {
 
+		
 		ucitajGradove();
 		ucitajManifestacije();
 
@@ -118,6 +272,9 @@ public class TestKultMan {
 			System.out.println("1. Prikaz gradova.");
 			System.out.println("2. Prikaz manifestacija.");
 			System.out.println("3. Pretraga manifestacije.");
+			System.out.println("4. Dodavanje manifestacije.");
+			System.out.println("5. Izmena manifestacije.");
+			System.out.println("6. Brisanje manifestacije.");
 			System.out.println("x. Izlaz.");
 			System.out.println(" Unesite opciju:");
 			opcija = sc.nextLine();
@@ -132,6 +289,15 @@ public class TestKultMan {
 			case "3":
 				System.out.println(pretraManifestacijePoId());
 				break;
+			case "4":
+				dodavanjeManifestacije();
+				break;
+			case "5":
+				izmenaManifestacije();
+				break;
+			case "6":
+				brisanje();
+				break;
 			case "x":
 				System.out.println("Izlaz.");
 				break;
@@ -141,6 +307,7 @@ public class TestKultMan {
 
 		} while (!opcija.equalsIgnoreCase("x"));
 
+		save();
 	}
 
 }
